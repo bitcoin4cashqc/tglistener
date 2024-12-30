@@ -2,3 +2,4 @@ python-dotenv
 aiogram
 pymongo
 web3
+bs4
