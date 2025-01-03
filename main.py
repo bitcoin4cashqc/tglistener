@@ -5,15 +5,18 @@ from web3 import Web3
 from pymongo import MongoClient
 from aiogram import Bot, Dispatcher, types
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Router
 import aiohttp
 from bs4 import BeautifulSoup
 from checker import api
 
-from dotenv import load_dotenv
+from dotenv import set_key, load_dotenv
+
 import asyncio
 
 load_dotenv()
+env_path = ".env"
 
 # Load environment variables
 ALCHEMY_ETH_URL = os.getenv("ALCHEMY_ETH_URL")
@@ -288,6 +291,75 @@ async def start_monitor_base(message: types.Message):
 @router.message(lambda message: message.text == "/start")
 async def start(message: types.Message):
     await message.reply("Welcome! Use /start_monitor_eth or /start_monitor_base to start monitoring Ethereum or Base chain respectively.")
+
+
+
+@router.message(lambda message: message.text.startswith("/config"))
+async def config_command(message: types.Message):
+    command_parts = message.text.split()
+    if len(command_parts) == 1:
+        # List all configurations
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=key, callback_data=f"config_edit:{key}")]
+                for key in [
+                    "ALCHEMY_ETH_URL",
+                    "ALCHEMY_BASE_URL",
+                    "TELEGRAM_TOKEN",
+                    "ETHERSCAN_API_KEY",
+                    "BASESCAN_API_KEY",
+                    "MONGO_URI",
+                    "TOKEN_SNIFFER_API",
+                    "RETRY_LIMIT",
+                    "RETRY_INTERVAL",
+                    "RETRY_INTERVAL_API",
+                    "MINIMUM_SCORE",
+                    "MAXIMUM_SIMILAR",
+                    "RETRY_BLOCK_DELAY",
+                ]
+            ]
+        )
+        await message.reply("Configuration Settings:", reply_markup=keyboard)
+    elif len(command_parts) == 2:
+        # Show the current value and ask for a new value
+        key = command_parts[1]
+        try:
+            current_value = globals()[key]
+            await message.reply(f"Current value of {key}: {current_value}\nSend /config {key} <new_value> to update.")
+        except KeyError:
+            await message.reply(f"Configuration {key} not found.")
+    elif len(command_parts) == 3:
+        # Update the configuration
+        key, value = command_parts[1], command_parts[2]
+        try:
+            if key in globals():
+                # Cast to int if the variable is an integer type
+                if isinstance(globals()[key], int):
+                    value = int(value)
+                # Update global variable
+                globals()[key] = value
+                # Persist to .env
+                set_key(env_path, key, str(value))
+                await message.reply(f"Configuration {key} updated to {value}.")
+            else:
+                await message.reply(f"Configuration {key} not found.")
+        except ValueError:
+            await message.reply(f"Invalid value for {key}. Expected an integer.")
+        except KeyError:
+            await message.reply(f"Configuration {key} not found.")
+
+
+@router.callback_query(lambda callback_query: callback_query.data.startswith("config_edit:"))
+async def config_edit_callback(callback_query: types.CallbackQuery):
+    key = callback_query.data.split(":")[1]
+    try:
+        current_value = globals()[key]
+        await callback_query.message.reply(
+            f"Current value of {key}: {current_value}\nSend /config {key} <new_value> to update."
+        )
+    except KeyError:
+        await callback_query.message.reply(f"Configuration {key} not found.")
+
 
 
 dp.include_router(router)
