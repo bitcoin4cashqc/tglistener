@@ -84,13 +84,13 @@ def formatToken(data):
             hackerLink = f"[hackers.tools](https://hackers.tools/honeypot/base/{data['address']})"
             honeypotLink = f"[Honeypot.is](https://honeypot.is/base?address={data['address']})"
     
-    if data["hacker"]:
-        msg += f"Liquidity {hackerLink}: {data["hacker"].get('liquidity', 'N/A')}\n"
-        msg += f"Is Safe {hackerLink}: {data['hacker'].get('is_safe', 'N/A')}\n\n"
+    # if data["hacker"]:
+    #     msg += f"Liquidity {hackerLink}: {data["hacker"].get('liquidity', 'N/A')}\n"
+    #     msg += f"Is Safe {hackerLink}: {data['hacker'].get('is_safe', 'N/A')}\n\n"
 
-    if data["honeypot"]:
-        msg += f"Liquidity {honeypotLink}: {data["honeypot"].get('pair', {}).get('liquidity', 'N/A')}\n"
-        msg += f"Is Honeypot {honeypotLink}: {data['honeypot'].get('honeypot_result', 'N/A')}\n\n"
+    # if data["honeypot"]:
+    #     msg += f"Liquidity {honeypotLink}: {data["honeypot"].get('pair', {}).get('liquidity', 'N/A')}\n"
+    #     msg += f"Is Honeypot {honeypotLink}: {data['honeypot'].get('honeypot_result', 'N/A')}\n\n"
 
     if data["tokensniffer"]:
         score = data["tokensniffer"].get('score', '0')
