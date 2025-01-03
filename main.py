@@ -66,49 +66,50 @@ def normalize_data(data):
         if data > 2**63 - 1 or data < -(2**63):
             return str(data)
     return data
-
 def formatToken(data):
-    msg = f"{data['chain'].upper()}: ${data['details'].get('symbol', 'N/A')} {data['details'].get('name', 'N/A')}\n\n"
+    # Chain-specific coloring for notifications
+    chain_display = "🟦 BASE" if data['chain'].upper() == "BASE" else "🟩 ETH"
 
-    if data['chain'].upper() == "ETH":
-        hackerLink = f"[hackers.tools](https://hackers.tools/honeypot/ethereum/{data['address']})"
-        honeypotLink = f"[Honeypot.is](https://honeypot.is/ethereum?address={data['address']})"
-    if data['chain'].upper() == "BASE":
-            
-        hackerLink = f"[hackers.tools](https://hackers.tools/honeypot/base/{data['address']})"
-        honeypotLink = f"[Honeypot.is](https://honeypot.is/base?address={data['address']})"
+    msg = f"{chain_display}: ${data['details'].get('symbol', 'N/A')} {data['details'].get('name', 'N/A')}\n\n"
 
+    # Add source code links if verified
     if data["verified"]:
         if data['chain'].upper() == "ETH":
             msg += f"[Source Code](https://etherscan.io/address/{data['address']}#code)\n"
-            hackerLink = f"[hackers.tools](https://hackers.tools/honeypot/ethereum/{data['address']})"
-            honeypotLink = f"[Honeypot.is](https://honeypot.is/ethereum?address={data['address']})"
-        if data['chain'].upper() == "BASE":
+        elif data['chain'].upper() == "BASE":
             msg += f"[Source Code](https://basescan.org/address/{data['address']}#code)\n"
-            hackerLink = f"[hackers.tools](https://hackers.tools/honeypot/base/{data['address']})"
-            honeypotLink = f"[Honeypot.is](https://honeypot.is/base?address={data['address']})"
-    
-    # if data["hacker"]:
-    #     msg += f"Liquidity {hackerLink}: {data["hacker"].get('liquidity', 'N/A')}\n"
-    #     msg += f"Is Safe {hackerLink}: {data['hacker'].get('is_safe', 'N/A')}\n\n"
 
-    # if data["honeypot"]:
-    #     msg += f"Liquidity {honeypotLink}: {data["honeypot"].get('pair', {}).get('liquidity', 'N/A')}\n"
-    #     msg += f"Is Honeypot {honeypotLink}: {data['honeypot'].get('honeypot_result', 'N/A')}\n\n"
-
+    # TokenSniffer details
     if data["tokensniffer"]:
-        score = data["tokensniffer"].get('score', '0')
-        msg += f"TokenSniffer Score: {score}\n"
+        score = data["tokensniffer"].get('score', 0)
         similar_tokens = data["tokensniffer"].get('similar', [])
         similar_count = len(similar_tokens)
-        msg += f"TokenSniffer Similar: {similar_count}\n\n"
-        
+
+        msg += f"Score: {score}\n"
+        msg += f"Similar Tokens: {similar_count}\n"
+        msg += f"Token Address: {data['address']}\n"
+
+        # Liquidity from hacker or honeypot APIs
+        liquidity = "N/A"
+        if data.get("hacker"):
+            liquidity = data["hacker"].get("liquidity", "N/A")
+        elif data.get("honeypot"):
+            liquidity = data["honeypot"].get("pair", {}).get("liquidity", "N/A")
+
+        msg += f"Total liquidity: {liquidity}\n"
+
+        # TokenSniffer link
+        chain_id = 1 if data['chain'].upper() == "ETH" else 8453
+        msg += f"[tokensniffer.com](https://tokensniffer.com/token/{chain_id}/{data['address']})\n"
+
+        # Check if the token passes thresholds
         if score >= MINIMUM_SCORE and similar_count <= MAXIMUM_SIMILAR:
             return msg
         else:
             return None
-    
-    return msg
+
+    return None
+
 
 async def retry_unverified_contracts():
     while True:
