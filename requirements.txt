@@ -3,3 +3,4 @@ aiogram
 pymongo
 web3
 bs4
+cffi
