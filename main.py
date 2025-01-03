@@ -26,6 +26,7 @@ ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY")
 BASESCAN_API_KEY = os.getenv("BASESCAN_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 TOKEN_SNIFFER_API = os.getenv("TOKEN_SNIFFER_API")
+TELEGRAM_CHAT_ID = int(os.getenv("TELEGRAM_CHAT_ID"))
 
 # Web3 and MongoDB setup
 web3_eth = Web3(Web3.HTTPProvider(ALCHEMY_ETH_URL))
@@ -167,7 +168,7 @@ async def retry_unverified_contracts():
 
 
 async def send_notification(message):
-    await bot.send_message(chat_id=1027097408, text=message,parse_mode="Markdown",disable_web_page_preview=True)
+    await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message,parse_mode="Markdown",disable_web_page_preview=True)
 
 
 async def monitor_blocks(web3_instance, chain):
@@ -265,6 +266,7 @@ def fetch_source_code(contract_address, chain):
     return None
 
 
+
 async def start_monitoring(chain):
     if not monitoring[chain]:
         monitoring[chain] = True
@@ -276,22 +278,63 @@ async def start_monitoring(chain):
         await send_notification(f"Monitoring stopped for {chain}")
 
 
-@router.message(lambda message: message.text == "/start_monitor_eth")
-async def start_monitor_eth(message: types.Message):
-    await start_monitoring("eth")
-    #await message.reply("Ethereum monitoring started.")
-
-
-@router.message(lambda message: message.text == "/start_monitor_base")
-async def start_monitor_base(message: types.Message):
-    await start_monitoring("base")
-    #await message.reply("Base monitoring started.")
-
-
 @router.message(lambda message: message.text == "/start")
 async def start(message: types.Message):
-    await message.reply("Welcome! Use /start_monitor_eth or /start_monitor_base to start monitoring Ethereum or Base chain respectively.")
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Start Ethereum Monitoring" if not monitoring["eth"] else "Stop Ethereum Monitoring",
+                    callback_data="monitor_eth"
+                ),
+                InlineKeyboardButton(
+                    text="Start Base Monitoring" if not monitoring["base"] else "Stop Base Monitoring",
+                    callback_data="monitor_base"
+                )
+            ],
+            [InlineKeyboardButton(text="Check Status", callback_data="status")]
+        ]
+    )
+    await message.reply("Welcome! Use the buttons below to manage monitoring.", reply_markup=keyboard)
 
+
+@router.callback_query(lambda callback_query: callback_query.data in ["monitor_eth", "monitor_base"])
+async def toggle_monitoring(callback_query: types.CallbackQuery):
+    chain = "eth" if callback_query.data == "monitor_eth" else "base"
+    await start_monitoring(chain)
+    action = "started" if monitoring[chain] else "stopped"
+    await callback_query.message.edit_text(
+        f"Monitoring {action} for {chain.capitalize()}",
+        reply_markup=await create_monitoring_keyboard()
+    )
+
+
+@router.callback_query(lambda callback_query: callback_query.data == "status")
+async def show_status(callback_query: types.CallbackQuery):
+    eth_status = "🟢 Active" if monitoring["eth"] else "🔴 Inactive"
+    base_status = "🟢 Active" if monitoring["base"] else "🔴 Inactive"
+
+    status_message = f"Monitoring Status:\n\nEthereum: {eth_status}\nBase: {base_status}"
+    await callback_query.message.edit_text(status_message, reply_markup=await create_monitoring_keyboard())
+
+
+async def create_monitoring_keyboard():
+    """Creates a keyboard dynamically based on monitoring status."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Start Ethereum Monitoring" if not monitoring["eth"] else "Stop Ethereum Monitoring",
+                    callback_data="monitor_eth"
+                ),
+                InlineKeyboardButton(
+                    text="Start Base Monitoring" if not monitoring["base"] else "Stop Base Monitoring",
+                    callback_data="monitor_base"
+                )
+            ],
+            [InlineKeyboardButton(text="Check Status", callback_data="status")]
+        ]
+    )
 
 
 @router.message(lambda message: message.text.startswith("/config"))
