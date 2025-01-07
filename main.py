@@ -51,6 +51,8 @@ MAXIMUM_SIMILAR = int(os.getenv("MAXIMUM_SIMILAR"))
 
 RETRY_BLOCK_DELAY = int(os.getenv("RETRY_BLOCK_DELAY")) 
 
+PENDING_TS = {"count": 0}
+
 
 
 def normalize_data(data):
@@ -161,7 +163,7 @@ async def analyze_contract(deployer, tx_hash, chain):
             contract_data["details"] = details
             
 
-            api_checks = await api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, RETRY_INTERVAL_API, RETRY_LIMIT)
+            api_checks = await api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, PENDING_TS,  RETRY_INTERVAL_API, RETRY_LIMIT)
 
             if api_checks is not None:
                 api_checks = normalize_data(api_checks)
@@ -251,8 +253,31 @@ async def show_status(callback_query: types.CallbackQuery):
     eth_status = "🟢 Active" if monitoring["eth"] else "🔴 Inactive"
     base_status = "🟢 Active" if monitoring["base"] else "🔴 Inactive"
 
-    status_message = f"Monitoring Status:\n\nEthereum: {eth_status}\nBase: {base_status}"
+    # Fetch TokenSniffer usage
+    usage_url = "https://tokensniffer.com/api/v2/usage"
+    headers = {"accept": "application/json"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(usage_url, headers=headers) as response:
+                if response.status == 200:
+                    usage_data = await response.json()
+                    remaining_tokens = usage_data.get("remaining_tokens", "N/A")
+                else:
+                    remaining_tokens = "N/A"
+    except Exception as e:
+        print(f"Error fetching TokenSniffer usage: {e}")
+        remaining_tokens = "N/A"
+
+    status_message = (
+        f"Monitoring Status:\n\n"
+        f"Ethereum: {eth_status}\n"
+        f"Base: {base_status}\n\n"
+        f"Pending Tokens: {PENDING_TS['count']}\n"
+        f"TokenSniffer Remaining Tokens: {remaining_tokens}"
+    )
+
     await callback_query.message.edit_text(status_message, reply_markup=await create_monitoring_keyboard())
+
 
 
 async def create_monitoring_keyboard():
