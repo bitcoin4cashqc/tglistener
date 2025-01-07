@@ -56,7 +56,7 @@ async def api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BAS
         return None
 
     # If no honeypot is detected, proceed with TokenSniffer API
-    token_sniffer_data = await check_token_sniffer(chain, contract_address, TOKEN_SNIFFER_API)
+    token_sniffer_data = await check_token_sniffer(chain, contract_address, TOKEN_SNIFFER_API, 60)
     print(token_sniffer_data)
     # Combine the results from all APIs
     result = {
@@ -231,18 +231,32 @@ async def check_honeypot_is(chain, contract_address):
         print(f"Honeypot.is checker error: {e}")
         return None
 
-async def check_token_sniffer(chain, contract_address,TOKEN_SNIFFER_API):
+
+async def check_token_sniffer(chain, contract_address, TOKEN_SNIFFER_API, pending_interval=60):
     chain_id = 1 if chain == "eth" else 8453
-    url = f"https://tokensniffer.com/api/v2/tokens/{chain_id}/{contract_address}?apikey={TOKEN_SNIFFER_API}&include_metrics=true&include_tests=true&include_similar=true&block_until_ready=true"
-   
+    url = f"https://tokensniffer.com/api/v2/tokens/{chain_id}/{contract_address}?apikey={TOKEN_SNIFFER_API}&include_metrics=true&include_tests=true&include_similar=true&block_until_ready=false"
     headers = {"accept": "application/json"}
-    try:
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-            async with session.get(url, headers=headers) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    print(f"TokenSniffer API error: {response.status}")
-    except Exception as e:
-        print(f"TokenSniffer request error: {e}")
-    return None
+
+    while True:
+        try:
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get("status") == "ready":
+                            return data
+                        elif data.get("status") == "pending":
+                            print(f"TokenSniffer status pending for {contract_address}. Retrying in {pending_interval} seconds...")
+                            await asyncio.sleep(pending_interval)
+                        else:
+                            print(f"Unexpected status from TokenSniffer: {data.get('status')}")
+                            return None
+                    elif response.status == 429:
+                        print(f"Rate limited by TokenSniffer for {contract_address}. Retrying in {pending_interval} seconds...")
+                        await asyncio.sleep(pending_interval)
+                    else:
+                        print(f"TokenSniffer API error: HTTP {response.status}")
+                        return None
+        except Exception as e:
+            print(f"TokenSniffer request error: {e}")
+            return None
