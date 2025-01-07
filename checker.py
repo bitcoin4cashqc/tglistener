@@ -1,12 +1,26 @@
 import aiohttp
 from bs4 import BeautifulSoup 
 import asyncio
+import requests
 
 
-async def api(chain, contract_address, TOKEN_SNIFFER_API, retry_interval=10, max_retries=5):
+async def api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, retry_interval=30, max_retries=120):
     retries = 0
-
+    source_code = None  # Initialize source_code as None
     while retries < max_retries:
+
+        # Fetch source code if it hasn't been fetched yet
+        if source_code is None:
+            source_code = fetch_source_code(contract_address, chain, ETHERSCAN_API_KEY, BASESCAN_API_KEY)
+            if source_code:
+                print(f"Source code fetched for {contract_address}. Proceeding with API checks.")
+            else:
+                print(f"Source code unavailable for {contract_address}. Retrying... ({retries + 1}/{max_retries})")
+                retries += 1
+                await asyncio.sleep(retry_interval)
+                continue  # Retry the loop if source_code is not fetched
+        
+
         # Perform Hacker API check
         hacker_data = await check_hacker(chain, contract_address)
         print(hacker_data)
@@ -46,6 +60,7 @@ async def api(chain, contract_address, TOKEN_SNIFFER_API, retry_interval=10, max
     print(token_sniffer_data)
     # Combine the results from all APIs
     result = {
+        "source_code": source_code,
         "hacker": hacker_data,
         "honeypot": honey_data,
         "tokensniffer": token_sniffer_data,
@@ -53,6 +68,17 @@ async def api(chain, contract_address, TOKEN_SNIFFER_API, retry_interval=10, max
 
     return result
 
+
+def fetch_source_code(contract_address, chain, ETHERSCAN_API_KEY, BASESCAN_API_KEY):
+    api_url = (
+        f"https://api.etherscan.io/api?module=contract&action=getsourcecode&address={contract_address}&apikey={ETHERSCAN_API_KEY}"
+        if chain == "eth" else
+        f"https://api.basescan.org/api?module=contract&action=getsourcecode&address={contract_address}&apikey={BASESCAN_API_KEY}"
+    )
+    response = requests.get(api_url).json()
+    if response["status"] == "1" and response["result"]:
+        return response["result"][0]["SourceCode"]
+    return None
 
 async def check_hacker(chain, contract_address):
     chain_id = "ethereum" if chain == "eth" else "base"

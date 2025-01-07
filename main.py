@@ -66,6 +66,8 @@ def normalize_data(data):
         if data > 2**63 - 1 or data < -(2**63):
             return str(data)
     return data
+
+
 def formatToken(data):
     # Chain-specific coloring for notifications
     chain_display = "🟦 BASE" if data['chain'].upper() == "BASE" else "🟩 ETH"
@@ -111,61 +113,6 @@ def formatToken(data):
     return None
 
 
-async def retry_unverified_contracts():
-    while True:
-        unverified_contracts = contracts_collection.find({"verified": False, "retries": {"$lt": RETRY_LIMIT}})
-        for contract in unverified_contracts:
-            chain = contract["chain"]
-            contract_address = contract["address"]
-            retries = contract.get("retries", 0)
-            print(f"Retrying to check {contract_address} on {chain.upper()}, retry : {retries}/{RETRY_LIMIT} ")
-
-            # Attempt to fetch the source code
-            source_code = fetch_source_code(contract_address, chain)
-            if source_code:
-                # Update source code and mark as verified
-                contracts_collection.update_one(
-                    {"address": contract_address},
-                    {"$set": {"verified": True, "source_code": source_code}}
-                )
-
-                
-                api_checks = await api(chain, contract_address, TOKEN_SNIFFER_API, RETRY_INTERVAL_API, RETRY_LIMIT)
-
-                if api_checks is not None:
-                    
-                   
-                    
-                    # Normalize the data to avoid MongoDB integer overflow
-                    api_checks = normalize_data(api_checks)
-                    
-                    # Update contract details in the database
-                    contracts_collection.update_one(
-                        {"address": contract_address},
-                        {
-                            "$set": {
-                                "hacker": api_checks["hacker"],
-                                "honeypot": api_checks["honeypot"],
-                                "tokensniffer": api_checks["tokensniffer"],
-                            }
-                        }
-                    )
-
-                    # Format and send the notification
-                    existing_contract = contracts_collection.find_one({"address": contract_address})
-                    if existing_contract:
-                        details_message = formatToken(existing_contract)
-                        if details_message is not None:
-                            await send_notification(details_message)
-            else:
-                # Increment the retry counter if the source code is not yet available
-                contracts_collection.update_one(
-                    {"address": contract_address},
-                    {"$inc": {"retries": 1}}
-                )
-
-        await asyncio.sleep(RETRY_INTERVAL)
-
 
 
 async def send_notification(message):
@@ -173,7 +120,7 @@ async def send_notification(message):
 
 
 async def monitor_blocks(web3_instance, chain):
-    latest_block = web3_instance.eth.block_number - 250
+    latest_block = web3_instance.eth.block_number
     while monitoring[chain]:
         try:
             print(f"Fetching block {latest_block} on {chain}")
@@ -212,18 +159,16 @@ async def analyze_contract(deployer, tx_hash, chain):
         }
         if is_erc20:
             contract_data["details"] = details
-            source_code = fetch_source_code(contract_address, chain)
-
             
-            if source_code:
-                contract_data["verified"] = True
-                contract_data["source_code"] = source_code
 
-
-            api_checks = await api(chain, contract_address, TOKEN_SNIFFER_API, RETRY_INTERVAL_API, RETRY_LIMIT)
+            api_checks = await api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, RETRY_INTERVAL_API, RETRY_LIMIT)
 
             if api_checks is not None:
                 api_checks = normalize_data(api_checks)
+                contract_data["verified"] = True
+                contract_data["source_code"] = api_checks["source_code"]
+
+
                 contract_data["hacker"] = api_checks["hacker"]
                 contract_data["honeypot"] = api_checks["honeypot"]
                 contract_data["tokensniffer"] = api_checks["tokensniffer"]
@@ -255,16 +200,7 @@ def check_erc20(contract_address, web3_instance):
         return False, None
 
 
-def fetch_source_code(contract_address, chain):
-    api_url = (
-        f"https://api.etherscan.io/api?module=contract&action=getsourcecode&address={contract_address}&apikey={ETHERSCAN_API_KEY}"
-        if chain == "eth" else
-        f"https://api.basescan.org/api?module=contract&action=getsourcecode&address={contract_address}&apikey={BASESCAN_API_KEY}"
-    )
-    response = requests.get(api_url).json()
-    if response["status"] == "1" and response["result"]:
-        return response["result"][0]["SourceCode"]
-    return None
+
 
 
 
@@ -410,7 +346,7 @@ dp.include_router(router)
 
 if __name__ == "__main__":
     async def main():
-        asyncio.create_task(retry_unverified_contracts())
+        #asyncio.create_task(retry_unverified_contracts())
         await dp.start_polling(bot)
 
     asyncio.run(main())
