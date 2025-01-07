@@ -254,26 +254,31 @@ async def show_status(callback_query: types.CallbackQuery):
     base_status = "🟢 Active" if monitoring["base"] else "🔴 Inactive"
 
     # Fetch TokenSniffer usage
-    usage_url = "https://tokensniffer.com/api/v2/usage"
+    usage_url = f"https://tokensniffer.com/api/v2/usage?apikey={TOKEN_SNIFFER_API}"
     headers = {"accept": "application/json"}
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
             async with session.get(usage_url, headers=headers) as response:
+                
                 if response.status == 200:
                     usage_data = await response.json()
-                    remaining_tokens = usage_data.get("remaining_tokens", "N/A")
+                    #print(usage_data)
+                    limit = usage_data.get("limit", "N/A")
+                    used = usage_data.get("used", "N/A")
                 else:
-                    remaining_tokens = "N/A"
+                    limit = "N/A"
+                    used = "N/A"
     except Exception as e:
         print(f"Error fetching TokenSniffer usage: {e}")
-        remaining_tokens = "N/A"
+        limit = "N/A"
+        used = "N/A"
 
     status_message = (
         f"Monitoring Status:\n\n"
         f"Ethereum: {eth_status}\n"
         f"Base: {base_status}\n\n"
         f"Pending Tokens: {PENDING_TS['count']}\n"
-        f"TokenSniffer Remaining Tokens: {remaining_tokens}"
+        f"TokenSniffer Limit/Used/Remaining: {limit}/{used}/{int(limit)-int(used)}"
     )
 
     await callback_query.message.edit_text(status_message, reply_markup=await create_monitoring_keyboard())
