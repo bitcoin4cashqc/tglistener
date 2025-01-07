@@ -11,7 +11,7 @@ async def api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BAS
 
         # Fetch source code if it hasn't been fetched yet
         if source_code is None:
-            source_code = fetch_source_code(contract_address, chain, ETHERSCAN_API_KEY, BASESCAN_API_KEY)
+            source_code = await fetch_source_code(contract_address, chain, ETHERSCAN_API_KEY, BASESCAN_API_KEY)
             if source_code:
                 print(f"Source code fetched for {contract_address}. Proceeding with API checks.")
             else:
@@ -68,23 +68,32 @@ async def api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BAS
 
     return result
 
-
-def fetch_source_code(contract_address, chain, ETHERSCAN_API_KEY, BASESCAN_API_KEY):
+async def fetch_source_code(contract_address, chain, ETHERSCAN_API_KEY, BASESCAN_API_KEY):
     api_url = (
         f"https://api.etherscan.io/api?module=contract&action=getsourcecode&address={contract_address}&apikey={ETHERSCAN_API_KEY}"
         if chain == "eth" else
         f"https://api.basescan.org/api?module=contract&action=getsourcecode&address={contract_address}&apikey={BASESCAN_API_KEY}"
     )
-    response = requests.get(api_url).json()
-    if response["status"] == "1" and response["result"]:
-        return response["result"][0]["SourceCode"]
+
+    try:
+        connector = aiohttp.TCPConnector(ssl=False)  # Disable SSL verification
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.get(api_url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data["status"] == "1" and data["result"]:
+                        return data["result"][0]["SourceCode"]
+    except Exception as e:
+        print(f"Error fetching source code: {e}")
+
     return None
+
 
 async def check_hacker(chain, contract_address):
     chain_id = "ethereum" if chain == "eth" else "base"
     try:
         url = f"https://hackers.tools/honeypot/{chain_id}/{contract_address}"
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
             async with session.get(url) as response:
                 html = await response.text()
                 soup = BeautifulSoup(html, 'html.parser')
@@ -154,7 +163,7 @@ async def check_honeypot_is(chain, contract_address):
     url = f"https://api.honeypot.is/v2/IsHoneypot?address={contract_address}&chainID={chain_id}"
 
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
             async with session.get(url) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -228,7 +237,7 @@ async def check_token_sniffer(chain, contract_address,TOKEN_SNIFFER_API):
    
     headers = {"accept": "application/json"}
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
             async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     return await response.json()

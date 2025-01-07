@@ -178,7 +178,7 @@ async def analyze_contract(deployer, tx_hash, chain):
 
                 if details_message is not None:
                     await send_notification(details_message)
-                    contracts_collection.insert_one(contract_data)
+                contracts_collection.insert_one(contract_data)
             
             
 
