@@ -16,6 +16,7 @@ async def api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BAS
                 print(f"Source code fetched for {contract_address}. Proceeding with API checks.")
             else:
                 print(f"Source code unavailable for {contract_address}. Retrying... ({retries + 1}/{max_retries})")
+               
                 retries += 1
                 await asyncio.sleep(retry_interval)
                 continue  # Retry the loop if source_code is not fetched
@@ -68,6 +69,7 @@ async def api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BAS
 
     return result
 
+
 async def fetch_source_code(contract_address, chain, ETHERSCAN_API_KEY, BASESCAN_API_KEY):
     api_url = (
         f"https://api.etherscan.io/api?module=contract&action=getsourcecode&address={contract_address}&apikey={ETHERSCAN_API_KEY}"
@@ -81,12 +83,16 @@ async def fetch_source_code(contract_address, chain, ETHERSCAN_API_KEY, BASESCAN
             async with session.get(api_url) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if data["status"] == "1" and data["result"]:
-                        return data["result"][0]["SourceCode"]
+                    if data.get("status") == "1" and data.get("result"):
+                        source_code = data["result"][0].get("SourceCode")
+                        # Ensure it returns None for empty or falsy source code
+                        if source_code and source_code.strip():  # Check for non-empty string
+                            return source_code.strip()
     except Exception as e:
         print(f"Error fetching source code: {e}")
 
     return None
+
 
 
 async def check_hacker(chain, contract_address):
