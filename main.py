@@ -44,7 +44,7 @@ router = Router()
 monitoring = {"eth": False, "base": False}
 RETRY_LIMIT = int(os.getenv("RETRY_LIMIT"))  # Max retries for unverified contracts
 RETRY_INTERVAL = int(os.getenv("RETRY_INTERVAL"))  # Retry source code
-RETRY_INTERVAL_API = int(os.getenv("RETRY_INTERVAL_API"))  # Retry appis
+
 
 MINIMUM_SCORE = int(os.getenv("MINIMUM_SCORE"))  
 MAXIMUM_SIMILAR = int(os.getenv("MAXIMUM_SIMILAR")) 
@@ -163,7 +163,7 @@ async def analyze_contract(deployer, tx_hash, chain):
             contract_data["details"] = details
             
 
-            api_checks = await api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, PENDING_TS,  RETRY_INTERVAL_API, RETRY_LIMIT)
+            api_checks = await api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, PENDING_TS,  RETRY_INTERVAL, RETRY_LIMIT)
 
             if api_checks is not None:
                 api_checks = normalize_data(api_checks)
@@ -322,7 +322,6 @@ async def config_command(message: types.Message):
                     "TOKEN_SNIFFER_API",
                     "RETRY_LIMIT",
                     "RETRY_INTERVAL",
-                    "RETRY_INTERVAL_API",
                     "MINIMUM_SCORE",
                     "MAXIMUM_SIMILAR",
                     "RETRY_BLOCK_DELAY",
