@@ -129,6 +129,7 @@ async def send_notification(message):
 
 async def check_past_tokens():
     while True:
+        print("Checking Past Tokens...")
         threshold_time = datetime.now(tz=timezone.utc)- timedelta(seconds=OLD_TIME)
         
         # Get tokens older than OLD_TIME that haven't been updated yet
