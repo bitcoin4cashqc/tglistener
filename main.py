@@ -10,6 +10,7 @@ from aiogram import Router
 import aiohttp
 from bs4 import BeautifulSoup
 from checker import api
+from datetime import datetime, timedelta
 
 from dotenv import set_key, load_dotenv
 
@@ -27,6 +28,11 @@ BASESCAN_API_KEY = os.getenv("BASESCAN_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 TOKEN_SNIFFER_API = os.getenv("TOKEN_SNIFFER_API")
 TELEGRAM_CHAT_ID = int(os.getenv("TELEGRAM_CHAT_ID"))
+
+
+OLD_TIME = int(os.getenv("OLD_TIME", 3600))  # 1 hour default
+INTERVAL = int(os.getenv("INTERVAL", 300))  # 5 minutes default
+
 
 # Web3 and MongoDB setup
 web3_eth = Web3(Web3.HTTPProvider(ALCHEMY_ETH_URL))
@@ -121,6 +127,37 @@ async def send_notification(message):
     await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message,parse_mode="Markdown",disable_web_page_preview=True)
 
 
+async def check_past_tokens():
+    while True:
+        threshold_time = datetime.now(tz=datetime.UTC)- timedelta(seconds=OLD_TIME)
+        
+        # Get tokens older than OLD_TIME that haven't been updated yet
+        past_tokens = contracts_collection.find({
+            "timestamp": {"$lte": threshold_time},
+            "notified": {"$exists": False}  # Ensure it's not already notified
+        })
+        
+        for token in past_tokens:
+            contract_address = token["address"]
+            chain = token["chain"]
+            print(f"Rechecking {contract_address} on {chain}")
+            
+            past_api_checks = await api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, PENDING_TS, 30, 5)
+            if past_api_checks is not None:
+                
+                
+                # Format and send a notification if the new score meets the threshold
+                updated_token = contracts_collection.find_one({"address": contract_address})
+                details_message = formatToken(updated_token)
+                if details_message:
+                    contracts_collection.update_one({"address": contract_address}, {"$set": {"tokensniffer": past_api_checks["tokensniffer"], "notified": True}})
+                    await send_notification(details_message)
+            #Breath
+            await asyncio.sleep(1)
+        
+        await asyncio.sleep(INTERVAL)
+
+
 async def monitor_blocks(web3_instance, chain):
     latest_block = web3_instance.eth.block_number
     while monitoring[chain]:
@@ -180,6 +217,7 @@ async def analyze_contract(deployer, tx_hash, chain):
 
                 if details_message is not None:
                     await send_notification(details_message)
+                    contract_data["notified"] = True
                 contracts_collection.insert_one(contract_data)
             
             
@@ -375,7 +413,7 @@ dp.include_router(router)
 
 if __name__ == "__main__":
     async def main():
-        #asyncio.create_task(retry_unverified_contracts())
+        asyncio.create_task(check_past_tokens())
         await dp.start_polling(bot)
 
     asyncio.run(main())

@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 import asyncio
 from asyncio import Semaphore
 
+async def pastToken(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, PENDING_TS, retry_interval=30, max_retries=120):
+    pass
 
 async def api(chain, contract_address, TOKEN_SNIFFER_API, ETHERSCAN_API_KEY, BASESCAN_API_KEY, PENDING_TS, retry_interval=30, max_retries=120):
     retries = 0
