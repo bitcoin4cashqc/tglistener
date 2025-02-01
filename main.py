@@ -10,7 +10,7 @@ from aiogram import Router
 import aiohttp
 from bs4 import BeautifulSoup
 from checker import api
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dotenv import set_key, load_dotenv
 
@@ -129,7 +129,7 @@ async def send_notification(message):
 
 async def check_past_tokens():
     while True:
-        threshold_time = datetime.now(tz=datetime.UTC)- timedelta(seconds=OLD_TIME)
+        threshold_time = datetime.now(tz=timezone.utc)- timedelta(seconds=OLD_TIME)
         
         # Get tokens older than OLD_TIME that haven't been updated yet
         past_tokens = contracts_collection.find({
