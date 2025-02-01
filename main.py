@@ -129,9 +129,9 @@ async def send_notification(message):
 
 async def check_past_tokens():
     while True:
-        print("Checking Past Tokens...")
-        threshold_time = datetime.now(tz=timezone.utc)- timedelta(seconds=OLD_TIME)
         
+        threshold_time = datetime.now(tz=timezone.utc)- timedelta(seconds=OLD_TIME)
+        print(f"Checking Past Tokens before {threshold_time}...")
         # Get tokens older than OLD_TIME that haven't been updated yet
         past_tokens = contracts_collection.find({
             "timestamp": {"$lte": threshold_time},
