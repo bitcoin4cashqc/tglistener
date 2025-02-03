@@ -365,6 +365,8 @@ async def config_command(message: types.Message):
                     "MINIMUM_SCORE",
                     "MAXIMUM_SIMILAR",
                     "RETRY_BLOCK_DELAY",
+                    "OLD_TIME",
+                    "INTERVAL",
                 ]
             ]
         )
