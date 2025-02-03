@@ -135,7 +135,8 @@ async def check_past_tokens():
         # Get tokens older than OLD_TIME that haven't been updated yet
         past_tokens = contracts_collection.find({
             "timestamp": {"$lte": threshold_time},
-            "notified": {"$exists": False}  # Ensure it's not already notified
+            "notified": {"$exists": False},  # Ensure it's not already notified
+            "tokensniffer": {"$exists": True, "$ne": None}
         })
         
         for token in past_tokens:
