@@ -131,10 +131,10 @@ async def check_past_tokens():
     while True:
         
         threshold_time = int(datetime.now(tz=timezone.utc).timestamp()) - OLD_TIME
-        print(f"Checking Past Tokens before {threshold_time}...")
+        print(f"Checking Past Tokens until {threshold_time}...")
         # Get tokens older than OLD_TIME that haven't been updated yet
         past_tokens = contracts_collection.find({
-            "timestamp": {"$lte": threshold_time},
+            "timestamp": {"$gte": threshold_time},
             "notified": {"$exists": False},  # Ensure it's not already notified
             "tokensniffer": {"$exists": True, "$ne": None}
         })
